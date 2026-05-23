@@ -14,6 +14,9 @@ yarn.lock
 # Git hooks
 .husky
 
+# GitHub Actions
+.github
+
 # Public assets
 public
 
