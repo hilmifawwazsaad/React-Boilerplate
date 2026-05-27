@@ -1,71 +1,55 @@
-name backend
-description API integration layer — HTTP client, service functions, data-fetching patterns, error handling, integration with external REST or GraphQL APIs. Use this skill when the user asks to add API calls, configure an HTTP client, or build src/api/ and src/services/ logic.
-license MIT
+---
+name: backend
+description: 'Design and generate external backend API code (any language/framework — Go, Rust, Python, PHP, JavaScript, Ruby, etc.) that serves a React Vite frontend. Use for API endpoints, auth, validation, and data modeling on a separate backend server.'
+license: MIT
+---
 
-## Scope
+> Read `.agents/software-principles/SKILL.md` first.
 
-API integration only. No server code in this repo. All backend logic lives in an external service.
+## Pre-Code Checklist
 
-## Layer Responsibilities
+1. Resource + HTTP method + action
+2. Request → response contract (input shape, output shape, errors)
+3. Auth requirement (public / authenticated / role-gated)
+4. Failure scenarios + validation rules
 
-| Layer          | Location                          | Rule                                                                               |
-| -------------- | --------------------------------- | ---------------------------------------------------------------------------------- |
-| HTTP client    | `src/lib/apiClient.ts`            | Single Axios/fetch instance. `baseURL` from `VITE_API_URL`. Auth via interceptors. |
-| Raw calls      | `src/api/<domain>.ts`             | 1 fn per endpoint. No business logic. Return typed data from `src/types/`.         |
-| Business logic | `src/services/<domain>Service.ts` | Orchestrate api/ calls, transform/filter data, domain errors.                      |
-| Data hook      | `src/hooks/use<Domain>.ts`        | Call service, manage loading/error state, expose to components.                    |
+## Response Envelope
 
-## Code Patterns
+Follow existing convention if one exists. If starting fresh, pick one shape and apply it consistently — never mix shapes across endpoints.
 
-```ts
-// src/lib/apiClient.ts
-import axios from 'axios';
-export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  headers: { 'Content-Type': 'application/json' },
-});
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-```
+Required regardless of shape:
 
-```ts
-// src/api/users.ts
-import { apiClient } from '@/lib/apiClient';
-import type { User } from '@/types/user';
-export const fetchUser = async (id: string): Promise<User> => {
-  const res = await apiClient.get(`/users/${id}`);
-  return res.data;
-};
-```
+- Success and error responses must be distinguishable
+- Validation errors must include field-level detail
+- Error responses must never expose stack traces, query strings, or internal paths
+- Type the envelope — never return untyped `any` or raw ORM objects
 
-```ts
-// src/types/error.ts
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-```
+## Design Rules
 
-## Rules
+- **Versioning** — prefix all routes `/api/v1/`.
+- **Query params** — `page`, `limit`, `sort`, `filter[key]=value`.
+- **Auth** — `Authorization: Bearer <token>` or HTTP-only cookie.
+- **Pagination** — all list endpoints: `{ items: T[], pagination: { page, limit, totalItems, totalPages } }`.
+- **CORS** — exact origin only. Never `*` with credentials.
+- **Naming** — pick camelCase or snake_case; consistent throughout.
+- **Docs** — expose OpenAPI spec at `/api/docs` when feasible.
 
-- `VITE_` prefix on all env vars. Store `VITE_API_URL` in `.env`, document in `.env.example`. Never commit `.env`.
-- Catch at service layer, re-throw with context. Never swallow errors.
-- 401/403 → handle globally in response interceptor.
+## Architecture
 
-## Checklist
+- Route handlers thin — business logic in service/use-case layer.
+- Global error handler → catches all unhandled errors → safe 500.
 
-- [ ] `src/lib/apiClient.ts` configured
-- [ ] `VITE_API_URL` in `.env` + `.env.example`
-- [ ] `src/api/<domain>.ts` — raw fns
-- [ ] `src/services/<domain>Service.ts` — business logic
-- [ ] `src/types/<domain>.ts` — types
-- [ ] `src/hooks/use<Domain>.ts` — data hook
-- [ ] Errors surfaced in UI, not swallowed
+## Security (non-negotiable)
+
+- Secrets via env vars only — never hardcoded.
+- Parameterized queries/ORM — no string-concatenated SQL.
+- Hash passwords (bcrypt/argon2).
+- Rate-limit auth endpoints.
+- Limit request body size.
+- Security headers in production.
+- Validate all input at boundary before processing.
+
+## Never Do
+
+- Trust unvalidated client input or hardcode secrets.
+- Business logic directly in route handlers.

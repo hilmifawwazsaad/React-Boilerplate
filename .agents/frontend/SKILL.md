@@ -1,53 +1,78 @@
-name frontend
-description Build React components, pages, hooks, and features for this React 19 + Vite + TypeScript + Tailwind CSS v4 project. Use this skill when the user asks to create or modify components, pages, hooks, contexts, utilities, or any frontend feature in the src/ directory.
-license MIT
+---
+name: frontend
+description: Generate production-grade React 19 + Vite TSX/TS code. Use for components, pages, layouts, and utilities — pure client-side UI, no server logic.
+license: MIT
+---
 
-## Project Structure
+> Read `.agents/software-principles/SKILL.md` first.
 
-```
-src/
-├── api/          # HTTP client instances and raw API call functions
-├── assets/       # Images, fonts, SVGs
-├── components/   # Reusable UI components
-├── constants/    # App-wide constants and enums
-├── contexts/     # React context providers and consumers
-├── hooks/        # Custom React hooks
-├── lib/          # Third-party library wrappers and config
-├── pages/        # Route-level page components
-├── routes/       # Router config (route definitions)
-├── services/     # Business logic that calls api/ functions
-├── types/        # Shared TypeScript types and interfaces
-├── utils/        # Pure utility functions
-├── validations/  # Zod schemas or validation logic
-├── App.tsx
-└── main.tsx
-```
+## Pre-Code Checklist
 
-## Conventions
+1. All four states: loading · error · empty · ideal
+2. Existing conventions in `pages/`, `components/`, `hooks/`, `services/`, `api/`, `lib/`
+3. Only use libraries in `package.json`
 
-**TypeScript** — explicit param/return types. `interface` for objects, `type` for unions. Shared types in `src/types/`. Never `any`.
+## Architecture
 
-**Components** — one per file, PascalCase. Named exports only (except pages + App.tsx). Props interface = `<Name>Props`. Split if >~150 lines.
+| Need                         | Solution                                                              |
+| ---------------------------- | --------------------------------------------------------------------- |
+| Fetch + render data          | Custom hook in `hooks/` calling `api/` function                       |
+| State / events / browser API | Component with local state — keep state as close to usage as possible |
+| Reusable UI                  | `components/` — pure rendering, no data fetching inside               |
+| Business logic               | `hooks/*.ts` (stateful) · `utils/*.ts` or `lib/*.ts` (pure functions) |
+| API calls                    | `api/*.ts` — typed fetch wrappers, no business logic                  |
+| Context / global state       | `contexts/` — only when prop drilling exceeds 2 levels                |
+| Shared types                 | `types/` or co-located `*.types.ts`                                   |
+| Constants                    | `constants/`                                                          |
+| Validation schemas           | `validations/`                                                        |
 
-**Hooks** — prefix `use`, place in `src/hooks/`. Return plain object `{ value, handler }`, not tuple (unless mirroring built-in).
+Extensions: `.tsx` for JSX · `.ts` for hooks, utilities, and types.
+Imports: use `@/` alias for all internal imports (e.g. `@/components/UserCard`).
 
-**Styling** — Tailwind classes in JSX. Complex conditionals: `clsx`/`cn`. No inline `style` unless dynamic. v4: `@import "tailwindcss"`, no config file.
+## TypeScript
 
-**API layer** — `src/api/`: raw fetch, no logic. `src/services/`: orchestrate + transform. `src/hooks/`: loading/error state.
+- Props → explicit `interface Props` or `type Props`. Never implicit.
+- Prefer `function Foo({ id }: Props): React.JSX.Element` over `React.FC`.
+- Children → `React.PropsWithChildren<Props>`.
+- Extend HTML elements → `React.ComponentProps<'button'>`, not manual re-typing.
+- Type all event handlers explicitly — never infer from `any`.
 
-**State** — local first. Context for global (auth, theme, locale). No external lib unless user requests.
+## Four States (all required)
 
-**Errors** — try/catch async, surface in UI. Never swallow.
+| State   | Implementation                                    |
+| ------- | ------------------------------------------------- |
+| Loading | `isLoading` state + skeleton or spinner component |
+| Error   | `error` state + user-friendly error message       |
+| Empty   | Inline message — helpful, not just "No data"      |
+| Ideal   | Normal render                                     |
 
-**Quality** — pass `pnpm lint:strict`. Format: `pnpm format`. Conventional Commits.
+## Data Fetching
 
-## Implementation Checklist
+- All fetches live in `api/*.ts` as typed async functions.
+- Wrap in custom hooks (`hooks/`) that expose `{ data, isLoading, error }`.
+- Never fetch inside component body or JSX — always via a hook.
+- Cleanup `useEffect` subscriptions and timers on unmount.
+- `useEffect` deps array must be exhaustive — no suppression comments. Extract stable refs with `useCallback`/`useMemo` if needed.
 
-1. Types → `src/types/` (or co-locate if component-only)
-2. Raw API fn → `src/api/` (if external data needed)
-3. Service fn → `src/services/`
-4. Data hook → `src/hooks/`
-5. Component → `src/components/` or page → `src/pages/`
-6. Route → `src/routes/` (if new page)
-7. Constants → `src/constants/` (if magic values)
-8. Validation schema → `src/validations/` (if user input)
+## Styling
+
+- Tailwind: existing tokens only. No `[]` arbitrary values unless truly one-off.
+- CSS Modules: follow existing class naming pattern.
+- Never invent design tokens, colors, or custom fonts.
+
+## Forms & Quality
+
+- Validate with `zod` if installed; otherwise type-guard inputs manually at the boundary.
+- Semantic HTML + ARIA. All interactive elements keyboard-accessible.
+- Stable `key` props — never array index for dynamic lists.
+- Env vars: prefix with `VITE_` to expose to the client; keep secrets server-side only.
+
+## Never Do
+
+- `any` type · `.jsx` / `.js` extensions
+- Libraries not in `package.json`
+- Fetch data directly inside a component — use a hook
+- Skip any of the four states
+- `key={index}` on dynamic lists
+- Suppress `useEffect` exhaustive-deps lint rule
+- Business logic inside JSX or component body
